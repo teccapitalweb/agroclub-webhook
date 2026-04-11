@@ -1,0 +1,13 @@
+{
+  "name": "agroclub-webhook",
+  "version": "1.0.0",
+  "description": "Shopify webhook server for AgroClub MX",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0"
+  }
+}
