@@ -160,5 +160,48 @@ app.post('/webhook/shopify/cancelacion', async (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CANCELACIÓN DIRECTA — llamada desde el frontend del panel VIP
+// ══════════════════════════════════════════════════════════════════════════════
+app.post('/cancelar-membresia', async (req, res) => {
+  // CORS para GitHub Pages
+  res.setHeader('Access-Control-Allow-Origin', 'https://teccapitalweb.github.io');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requerido' });
+
+    console.log('Cancelación directa solicitada por:', email);
+
+    const miembro = await buscarMiembroPorEmail(email.toLowerCase().trim());
+
+    if (!miembro) {
+      return res.status(404).json({ error: 'Miembro no encontrado' });
+    }
+
+    await miembro.ref.update({
+      estado: 'inactivo',
+      canceladoEn: new Date().toISOString()
+    });
+
+    console.log('Membresía cancelada directamente:', email);
+    res.status(200).json({ success: true });
+
+  } catch (err) {
+    console.error('Error en cancelación directa:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// OPTIONS preflight para CORS
+app.options('/cancelar-membresia', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', 'https://teccapitalweb.github.io');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`AgroClub Webhook running on port ${PORT}`));
