@@ -100,7 +100,19 @@ app.post('/webhook/shopify', async (req, res) => {
         shopifyOrderId: String(order.id),
         ultimoPago: new Date().toISOString()
       }, { merge: true });
-      console.log('Miembro activado:', email, plan);
+
+      // Registrar pago en colección pagos
+      const monto = order.total_price
+        ? '$' + parseFloat(order.total_price).toFixed(2) + ' ' + (order.currency || 'MXN')
+        : '—';
+      await db.collection('pagos').add({
+        nombre, email, plan, monto,
+        shopifyOrderId: String(order.id),
+        fecha: new Date().toISOString(),
+        estado: 'confirmado'
+      });
+
+      console.log('Miembro activado y pago registrado:', email, plan);
     }
 
     res.status(200).json({ success: true });
