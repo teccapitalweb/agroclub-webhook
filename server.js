@@ -16,96 +16,84 @@ const auth = admin.auth();
 app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
+// ── Helper: verificar firma Shopify ─────────────────────────────────────────
+function verificarFirma(req) {
+  const hmac   = req.headers['x-shopify-hmac-sha256'];
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const hash   = crypto.createHmac('sha256', secret).update(req.body).digest('base64');
+  return hash === hmac;
+}
+
+// ── Helper: buscar miembro por email ────────────────────────────────────────
+async function buscarMiembroPorEmail(email) {
+  // Primero por UID de Auth
+  try {
+    const user = await auth.getUserByEmail(email);
+    const doc  = await db.collection('miembros').doc(user.uid).get();
+    if (doc.exists) return { uid: user.uid, ref: doc.ref };
+  } catch (e) {}
+
+  // Fallback: buscar por campo email en la colección
+  const snap = await db.collection('miembros').where('email', '==', email).limit(1).get();
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    return { uid: doc.id, ref: doc.ref };
+  }
+  return null;
+}
+
 // Health check
 app.get('/', (req, res) => res.json({ status: 'AgroClub Webhook OK 🌱' }));
 
-// Shopify webhook - order paid
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGO RECIBIDO — activar membresía
+// ══════════════════════════════════════════════════════════════════════════════
 app.post('/webhook/shopify', async (req, res) => {
   try {
-    // Verify Shopify signature
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-    const hash = crypto
-      .createHmac('sha256', secret)
-      .update(req.body)
-      .digest('base64');
-
-    if (hash !== hmac) {
-      console.log('Invalid Shopify signature');
+    if (!verificarFirma(req)) {
+      console.log('Firma inválida - orders/paid');
       return res.status(401).send('Unauthorized');
     }
 
     const order = JSON.parse(req.body.toString());
-    console.log('Order received:', order.id, order.email);
+    console.log('Pago recibido:', order.id, order.email);
 
     const email = order.email?.toLowerCase().trim();
     if (!email) return res.status(400).json({ error: 'No email in order' });
 
-    // Nombre: billing_address primero, luego customer, luego email
-    const firstName = order.billing_address?.first_name
-      || order.customer?.first_name
-      || email.split('@')[0];
-    const lastName = order.billing_address?.last_name
-      || order.customer?.last_name
-      || '';
-    const nombre = (firstName + ' ' + lastName).trim();
-    const whatsapp = order.billing_address?.phone
-      || order.customer?.phone
-      || '';
+    const firstName = order.billing_address?.first_name || order.customer?.first_name || email.split('@')[0];
+    const lastName  = order.billing_address?.last_name  || order.customer?.last_name  || '';
+    const nombre    = (firstName + ' ' + lastName).trim();
+    const whatsapp  = order.billing_address?.phone || order.customer?.phone || '';
 
-    // Plan desde line items
-    const lineItem = order.line_items?.[0];
-    const productTitle = lineItem?.title?.toLowerCase() || '';
+    const productTitle = order.line_items?.[0]?.title?.toLowerCase() || '';
     const plan = productTitle.includes('anual') ? 'VIP Anual' : 'VIP Mensual';
 
-    // Fecha de vencimiento
     const vence = new Date();
-    if (plan === 'VIP Anual') {
-      vence.setFullYear(vence.getFullYear() + 1);
-    } else {
-      vence.setMonth(vence.getMonth() + 1);
-    }
-    const venceStr = vence.toLocaleDateString('es-MX', {
-      day: 'numeric', month: 'long', year: 'numeric'
-    });
+    plan === 'VIP Anual' ? vence.setFullYear(vence.getFullYear() + 1) : vence.setMonth(vence.getMonth() + 1);
+    const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Buscar si el usuario ya existe en Firebase Auth
     let uid;
     let usuarioNuevo = false;
 
     try {
       const user = await auth.getUserByEmail(email);
       uid = user.uid;
-      console.log('Usuario ya existe en Auth:', uid);
-      // NO tocamos la contraseña — el usuario ya la tiene
+      console.log('Usuario existe:', uid);
     } catch (e) {
-      // No existe — NO creamos cuenta aquí
-      // Solo guardamos en Firestore con estado pendiente_registro
-      // El usuario creará su cuenta desde la página de ventas
-      console.log('Usuario no existe en Auth, guardando como pendiente_registro');
       usuarioNuevo = true;
+      console.log('Usuario no existe, guardando pago pendiente');
     }
 
     if (usuarioNuevo) {
-      // Guardar por email como documento temporal
-      // Se activará cuando el usuario cree su cuenta
       await db.collection('pagos_pendientes').doc(email).set({
-        email,
-        nombre,
-        whatsapp,
-        plan,
-        vence: venceStr,
+        email, nombre, whatsapp, plan, vence: venceStr,
         shopifyOrderId: String(order.id),
         fechaPago: new Date().toISOString()
       });
-      console.log('Pago pendiente guardado para:', email);
     } else {
-      // Usuario ya existe — activar directamente en miembros
       await db.collection('miembros').doc(uid).set({
-        nombre,
-        email,
-        whatsapp,
-        plan,
+        nombre, email, whatsapp, plan,
         estado: 'activo',
         vence: venceStr,
         fechaRegistro: new Date().toISOString(),
@@ -115,10 +103,47 @@ app.post('/webhook/shopify', async (req, res) => {
       console.log('Miembro activado:', email, plan);
     }
 
-    res.status(200).json({ success: true, message: usuarioNuevo ? 'Pago guardado, esperando registro' : 'Miembro activado' });
+    res.status(200).json({ success: true });
 
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('Error en pago:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CANCELACIÓN — desactivar membresía
+// ══════════════════════════════════════════════════════════════════════════════
+app.post('/webhook/shopify/cancelacion', async (req, res) => {
+  try {
+    if (!verificarFirma(req)) {
+      console.log('Firma inválida - cancelación');
+      return res.status(401).send('Unauthorized');
+    }
+
+    const data  = JSON.parse(req.body.toString());
+    const email = (data.email || data.customer?.email)?.toLowerCase().trim();
+    console.log('Cancelación recibida para:', email);
+
+    if (!email) return res.status(400).json({ error: 'No email en cancelación' });
+
+    const miembro = await buscarMiembroPorEmail(email);
+
+    if (!miembro) {
+      console.log('Miembro no encontrado para cancelación:', email);
+      return res.status(200).json({ message: 'Miembro no encontrado, nada que cancelar' });
+    }
+
+    await miembro.ref.update({
+      estado: 'inactivo',
+      canceladoEn: new Date().toISOString()
+    });
+
+    console.log('Membresía cancelada:', email);
+    res.status(200).json({ success: true, message: 'Membresía cancelada' });
+
+  } catch (err) {
+    console.error('Error en cancelación:', err);
     res.status(500).json({ error: err.message });
   }
 });
