@@ -38,53 +38,84 @@ app.post('/webhook/shopify', async (req, res) => {
     const order = JSON.parse(req.body.toString());
     console.log('Order received:', order.id, order.email);
 
-    const email = order.email;
-    const nombre = order.billing_address?.first_name + ' ' + (order.billing_address?.last_name || '');
-    const whatsapp = order.billing_address?.phone || '';
+    const email = order.email?.toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'No email in order' });
 
-    // Determine plan from line items
+    // Nombre: billing_address primero, luego customer, luego email
+    const firstName = order.billing_address?.first_name
+      || order.customer?.first_name
+      || email.split('@')[0];
+    const lastName = order.billing_address?.last_name
+      || order.customer?.last_name
+      || '';
+    const nombre = (firstName + ' ' + lastName).trim();
+    const whatsapp = order.billing_address?.phone
+      || order.customer?.phone
+      || '';
+
+    // Plan desde line items
     const lineItem = order.line_items?.[0];
     const productTitle = lineItem?.title?.toLowerCase() || '';
     const plan = productTitle.includes('anual') ? 'VIP Anual' : 'VIP Mensual';
 
-    // Calculate expiry date
+    // Fecha de vencimiento
     const vence = new Date();
     if (plan === 'VIP Anual') {
       vence.setFullYear(vence.getFullYear() + 1);
     } else {
       vence.setMonth(vence.getMonth() + 1);
     }
-    const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+    const venceStr = vence.toLocaleDateString('es-MX', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
 
-    // Check if user exists in Firebase Auth
+    // Buscar si el usuario ya existe en Firebase Auth
     let uid;
+    let usuarioNuevo = false;
+
     try {
       const user = await auth.getUserByEmail(email);
       uid = user.uid;
-      console.log('User exists:', uid);
+      console.log('Usuario ya existe en Auth:', uid);
+      // NO tocamos la contraseña — el usuario ya la tiene
     } catch (e) {
-      // User doesn't exist - create with temp password
-      const tempPassword = Math.random().toString(36).slice(-8) + 'Ag1!';
-      const newUser = await auth.createUser({ email, password: tempPassword, displayName: nombre.trim() });
-      uid = newUser.uid;
-      console.log('User created:', uid);
+      // No existe — NO creamos cuenta aquí
+      // Solo guardamos en Firestore con estado pendiente_registro
+      // El usuario creará su cuenta desde la página de ventas
+      console.log('Usuario no existe en Auth, guardando como pendiente_registro');
+      usuarioNuevo = true;
     }
 
-    // Save/update member in Firestore
-    await db.collection('miembros').doc(uid).set({
-      nombre: nombre.trim(),
-      email,
-      whatsapp,
-      plan,
-      estado: 'activo',
-      vence: venceStr,
-      fechaRegistro: new Date().toISOString(),
-      shopifyOrderId: String(order.id),
-      ultimoPago: new Date().toISOString()
-    }, { merge: true });
+    if (usuarioNuevo) {
+      // Guardar por email como documento temporal
+      // Se activará cuando el usuario cree su cuenta
+      await db.collection('pagos_pendientes').doc(email).set({
+        email,
+        nombre,
+        whatsapp,
+        plan,
+        vence: venceStr,
+        shopifyOrderId: String(order.id),
+        fechaPago: new Date().toISOString()
+      });
+      console.log('Pago pendiente guardado para:', email);
+    } else {
+      // Usuario ya existe — activar directamente en miembros
+      await db.collection('miembros').doc(uid).set({
+        nombre,
+        email,
+        whatsapp,
+        plan,
+        estado: 'activo',
+        vence: venceStr,
+        fechaRegistro: new Date().toISOString(),
+        shopifyOrderId: String(order.id),
+        ultimoPago: new Date().toISOString()
+      }, { merge: true });
+      console.log('Miembro activado:', email, plan);
+    }
 
-    console.log('Member activated:', email, plan);
-    res.status(200).json({ success: true, message: 'Member activated' });
+    res.status(200).json({ success: true, message: usuarioNuevo ? 'Pago guardado, esperando registro' : 'Miembro activado' });
 
   } catch (err) {
     console.error('Webhook error:', err);
