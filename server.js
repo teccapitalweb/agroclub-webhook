@@ -205,3 +205,64 @@ app.options('/cancelar-membresia', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`AgroClub Webhook running on port ${PORT}`));
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CREAR CHECKOUT — Railway usa Admin token para crear checkout con email
+// ══════════════════════════════════════════════════════════════════════════════
+app.options('/crear-checkout', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
+});
+
+app.post('/crear-checkout', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  try {
+    const { productId, email } = req.body;
+    if (!productId || !email) return res.status(400).json({ error: 'Faltan datos' });
+
+    const SHOP  = 'pfueck-wm.myshopify.com';
+    const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+
+    const VARIANTS = {
+      '8462089257014': { variantId: 45322441687094, sellingPlanId: 2071691318 },
+      '8462204141622': { variantId: 45322590224438, sellingPlanId: 2071724086 }
+    };
+    const plan = VARIANTS[productId];
+    if (!plan) return res.status(400).json({ error: 'Producto no encontrado' });
+
+    const draftRes = await fetch(`https://${SHOP}/admin/api/2023-10/draft_orders.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': TOKEN
+      },
+      body: JSON.stringify({
+        draft_order: {
+          line_items: [{
+            variant_id: plan.variantId,
+            quantity: 1,
+            applied_selling_plan: { selling_plan_id: plan.sellingPlanId }
+          }],
+          email,
+          use_customer_default_address: false
+        }
+      })
+    });
+
+    const draftData = await draftRes.json();
+    console.log('Draft order response:', JSON.stringify(draftData));
+    const invoiceUrl = draftData?.draft_order?.invoice_url;
+    if (!invoiceUrl) return res.status(500).json({ error: 'No se pudo crear checkout', detail: draftData });
+
+    res.json({ checkoutUrl: invoiceUrl });
+
+  } catch (err) {
+    console.error('Error crear-checkout:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
