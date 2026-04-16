@@ -266,3 +266,35 @@ app.post('/crear-checkout', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── OAuth callback — captura code y obtiene access token ─────────────────────
+app.get('/auth/callback', async (req, res) => {
+  const { code, shop } = req.query;
+  if (!code || !shop) return res.status(400).send('Faltan parámetros');
+
+  try {
+    const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id:     'af33db76b7b0f68c1dba2d4d54e79112',
+        client_secret: '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',
+        code
+      })
+    });
+    const tokenData = await tokenRes.json();
+    const token = tokenData.access_token;
+
+    if (!token) {
+      console.error('Token error:', JSON.stringify(tokenData));
+      return res.status(500).send('No se pudo obtener el token: ' + JSON.stringify(tokenData));
+    }
+
+    console.log('ACCESS TOKEN OBTENIDO:', token);
+    res.send(`<h1>Token obtenido ✅</h1><p><strong>${token}</strong></p><p>Copia este token y agrégalo en Railway como SHOPIFY_ACCESS_TOKEN</p>`);
+
+  } catch (err) {
+    console.error('Auth error:', err);
+    res.status(500).send('Error: ' + err.message);
+  }
+});
