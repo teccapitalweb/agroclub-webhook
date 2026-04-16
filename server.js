@@ -249,7 +249,9 @@ app.post('/crear-checkout', async (req, res) => {
             applied_selling_plan: { selling_plan_id: plan.sellingPlanId }
           }],
           email,
-          use_customer_default_address: false
+          use_customer_default_address: false,
+          note: 'AgroClub MX',
+          redirect_url: `https://teccapitalweb.github.io/AgroClub---mx/?email=${encodeURIComponent(email)}&paid=true`
         }
       })
     });
