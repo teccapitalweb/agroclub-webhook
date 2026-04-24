@@ -59,7 +59,7 @@ app.get('/', (req, res) => res.json({ status: 'AgroClub Webhook OK 🌱', stripe
 // ═════════════════════════════════════════════════════════════════════════════
 app.post('/crear-checkout', async (req, res) => {
   try {
-    const { plan, email, uid, nombre } = req.body;
+    const { plan, email, uid, nombre, whatsapp } = req.body;
 
     if (!email) return res.status(400).json({ error: 'Email requerido' });
     if (!plan || !['mensual', 'anual'].includes(plan)) {
@@ -76,6 +76,7 @@ app.post('/crear-checkout', async (req, res) => {
       metadata: {
         uid: uid || '',
         nombre: nombre || '',
+        whatsapp: whatsapp || '',
         plan
       },
       subscription_data: {
@@ -83,6 +84,7 @@ app.post('/crear-checkout', async (req, res) => {
           uid: uid || '',
           email,
           nombre: nombre || '',
+          whatsapp: whatsapp || '',
           plan
         }
       },
@@ -139,7 +141,9 @@ app.post('/stripe', async (req, res) => {
         const session = event.data.object;
         const email = (session.customer_email || session.customer_details?.email || '').toLowerCase().trim();
         const nombre = session.metadata?.nombre || session.customer_details?.name || email.split('@')[0];
-        const whatsapp = session.customer_details?.phone || '';
+        // ═══ FIX: WhatsApp desde múltiples fuentes ═══
+        // Prioridad: 1) metadata (mandado por el frontend) → 2) usuarios_free → 3) Stripe phone
+        let whatsapp = session.metadata?.whatsapp || '';
         const planKey = session.metadata?.plan || 'mensual';
         const plan = planKey === 'anual' ? 'VIP Anual' : 'VIP Mensual';
 
@@ -159,6 +163,27 @@ app.post('/stripe', async (req, res) => {
             const user = await auth.getUserByEmail(email);
             uid = user.uid;
           } catch (e) {}
+        }
+
+        // ═══ FIX: Si aún no tenemos WhatsApp, buscar en usuarios_free ═══
+        if (!whatsapp && uid) {
+          try {
+            const freeDoc = await db.collection('usuarios_free').doc(uid).get();
+            if (freeDoc.exists) {
+              const freeData = freeDoc.data();
+              if (freeData.whatsapp) {
+                whatsapp = freeData.whatsapp;
+                console.log('📱 WhatsApp recuperado de usuarios_free:', whatsapp);
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ No se pudo leer usuarios_free:', e.message);
+          }
+        }
+
+        // Último fallback: el phone que Stripe pudo haber capturado
+        if (!whatsapp) {
+          whatsapp = session.customer_details?.phone || '';
         }
 
         if (uid) {
