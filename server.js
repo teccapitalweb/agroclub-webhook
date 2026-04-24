@@ -1,10 +1,10 @@
 const express = require('express');
-const crypto = require('crypto');
 const admin = require('firebase-admin');
+const Stripe = require('stripe');
 
 const app = express();
 
-// Firebase Admin init
+// ─── Firebase Admin init ─────────────────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -12,173 +12,271 @@ admin.initializeApp({
 const db = admin.firestore();
 const auth = admin.auth();
 
-// Raw body for Shopify signature verification
-app.use('/webhook', express.raw({ type: 'application/json' }));
+// ─── Stripe init ─────────────────────────────────────────────────────────────
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+// Price IDs (en variables de entorno para poder cambiar sin tocar código)
+const PRICE_MENSUAL = process.env.STRIPE_PRICE_MENSUAL || 'price_1TPb9nPBgqsOPfUYOzCZpX42';
+const PRICE_ANUAL   = process.env.STRIPE_PRICE_ANUAL   || 'price_1TPbCQPBgqsOPfUYZhUk9OGQ';
+
+// ─── CORS global ─────────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, stripe-signature');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// ─── Raw body para Stripe (DEBE ir antes de express.json) ────────────────────
+app.use('/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
-// ── Helper: verificar firma Shopify ─────────────────────────────────────────
-function verificarFirma(req) {
-  const hmac   = req.headers['x-shopify-hmac-sha256'];
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  const hash   = crypto.createHmac('sha256', secret).update(req.body).digest('base64');
-  return hash === hmac;
-}
-
-// ── Helper: buscar miembro por email ────────────────────────────────────────
+// ─── Helper: buscar miembro por email ────────────────────────────────────────
 async function buscarMiembroPorEmail(email) {
-  // Primero por UID de Auth
   try {
     const user = await auth.getUserByEmail(email);
     const doc  = await db.collection('miembros').doc(user.uid).get();
-    if (doc.exists) return { uid: user.uid, ref: doc.ref };
+    if (doc.exists) return { uid: user.uid, ref: doc.ref, userExists: true };
+    return { uid: user.uid, ref: db.collection('miembros').doc(user.uid), userExists: true };
   } catch (e) {}
 
-  // Fallback: buscar por campo email en la colección
   const snap = await db.collection('miembros').where('email', '==', email).limit(1).get();
   if (!snap.empty) {
     const doc = snap.docs[0];
-    return { uid: doc.id, ref: doc.ref };
+    return { uid: doc.id, ref: doc.ref, userExists: false };
   }
   return null;
 }
 
 // Health check
-app.get('/', (req, res) => res.json({ status: 'AgroClub Webhook OK 🌱' }));
+app.get('/', (req, res) => res.json({ status: 'AgroClub Webhook OK 🌱', stripe: true }));
 
-// ══════════════════════════════════════════════════════════════════════════════
-// PAGO RECIBIDO — activar membresía
-// ══════════════════════════════════════════════════════════════════════════════
-app.post('/webhook/shopify', async (req, res) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// 1) CREAR CHECKOUT SESSION — Stripe Embedded
+// El frontend llama aquí y recibe un clientSecret que monta el formulario
+// ═════════════════════════════════════════════════════════════════════════════
+app.post('/crear-checkout', async (req, res) => {
   try {
-    if (!verificarFirma(req)) {
-      console.log('Firma inválida - orders/paid');
-      return res.status(401).send('Unauthorized');
+    const { plan, email, uid, nombre } = req.body;
+
+    if (!email) return res.status(400).json({ error: 'Email requerido' });
+    if (!plan || !['mensual', 'anual'].includes(plan)) {
+      return res.status(400).json({ error: 'Plan inválido (mensual|anual)' });
     }
 
-    const order = JSON.parse(req.body.toString());
-    console.log('Pago recibido:', order.id, order.email);
+    const priceId = plan === 'anual' ? PRICE_ANUAL : PRICE_MENSUAL;
 
-    const email = order.email?.toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'No email in order' });
-
-    const firstName = order.billing_address?.first_name || order.customer?.first_name || email.split('@')[0];
-    const lastName  = order.billing_address?.last_name  || order.customer?.last_name  || '';
-    const nombre    = (firstName + ' ' + lastName).trim();
-    const whatsapp  = order.billing_address?.phone || order.customer?.phone || '';
-
-    const productTitle = order.line_items?.[0]?.title?.toLowerCase() || '';
-    const plan = productTitle.includes('anual') ? 'VIP Anual' : 'VIP Mensual';
-
-    const vence = new Date();
-    plan === 'VIP Anual' ? vence.setFullYear(vence.getFullYear() + 1) : vence.setMonth(vence.getMonth() + 1);
-    const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
-
-    let uid;
-    let usuarioNuevo = false;
-
-    try {
-      const user = await auth.getUserByEmail(email);
-      uid = user.uid;
-      console.log('Usuario existe:', uid);
-    } catch (e) {
-      usuarioNuevo = true;
-      console.log('Usuario no existe, guardando pago pendiente');
-    }
-
-    if (usuarioNuevo) {
-      await db.collection('pagos_pendientes').doc(email).set({
-        email, nombre, whatsapp, plan, vence: venceStr,
-        shopifyOrderId: String(order.id),
-        fechaPago: new Date().toISOString()
-      });
-    } else {
-      await db.collection('miembros').doc(uid).set({
-        nombre, email, whatsapp, plan,
-        estado: 'activo',
-        vence: venceStr,
-        fechaRegistro: new Date().toISOString(),
-        shopifyOrderId: String(order.id),
-        ultimoPago: new Date().toISOString()
-      }, { merge: true });
-
-      // Registrar pago en colección pagos
-      const monto = order.total_price
-        ? '$' + parseFloat(order.total_price).toFixed(2) + ' ' + (order.currency || 'MXN')
-        : '—';
-      await db.collection('pagos').add({
-        nombre, email, plan, monto,
-        shopifyOrderId: String(order.id),
-        fecha: new Date().toISOString(),
-        estado: 'confirmado'
-      });
-
-      console.log('Miembro activado y pago registrado:', email, plan);
-    }
-
-    res.status(200).json({ success: true });
-
-  } catch (err) {
-    console.error('Error en pago:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// CANCELACIÓN — desactivar membresía
-// ══════════════════════════════════════════════════════════════════════════════
-app.post('/webhook/shopify/cancelacion', async (req, res) => {
-  try {
-    if (!verificarFirma(req)) {
-      console.log('Firma inválida - cancelación');
-      return res.status(401).send('Unauthorized');
-    }
-
-    const data  = JSON.parse(req.body.toString());
-    const email = (data.email || data.customer?.email)?.toLowerCase().trim();
-    console.log('Cancelación recibida para:', email);
-
-    if (!email) return res.status(400).json({ error: 'No email en cancelación' });
-
-    const miembro = await buscarMiembroPorEmail(email);
-
-    if (!miembro) {
-      console.log('Miembro no encontrado para cancelación:', email);
-      return res.status(200).json({ message: 'Miembro no encontrado, nada que cancelar' });
-    }
-
-    await miembro.ref.update({
-      estado: 'inactivo',
-      canceladoEn: new Date().toISOString()
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      ui_mode: 'embedded',
+      line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: email,
+      metadata: {
+        uid: uid || '',
+        nombre: nombre || '',
+        plan
+      },
+      subscription_data: {
+        metadata: {
+          uid: uid || '',
+          email,
+          nombre: nombre || '',
+          plan
+        }
+      },
+      return_url: `https://teccapitalweb.github.io/AgroClub---mx/index.html?pago_exitoso=1&session_id={CHECKOUT_SESSION_ID}`
     });
 
-    console.log('Membresía cancelada:', email);
-    res.status(200).json({ success: true, message: 'Membresía cancelada' });
+    console.log('✅ Checkout session creada:', session.id, 'para', email);
+    res.json({ clientSecret: session.client_secret });
 
   } catch (err) {
-    console.error('Error en cancelación:', err);
+    console.error('❌ Error crear-checkout:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// CANCELACIÓN DIRECTA — llamada desde el frontend del panel VIP
-// ══════════════════════════════════════════════════════════════════════════════
-app.post('/cancelar-membresia', async (req, res) => {
-  // CORS para GitHub Pages
-  res.setHeader('Access-Control-Allow-Origin', 'https://teccapitalweb.github.io');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// ═════════════════════════════════════════════════════════════════════════════
+// 2) VERIFICAR SESSION — el frontend puede preguntar el estado después de pagar
+// ═════════════════════════════════════════════════════════════════════════════
+app.get('/verificar-session/:sessionId', async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+    res.json({
+      status: session.status,
+      payment_status: session.payment_status,
+      customer_email: session.customer_email
+    });
+  } catch (err) {
+    console.error('❌ Error verificar-session:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// ═════════════════════════════════════════════════════════════════════════════
+// 3) WEBHOOK STRIPE — recibe eventos y actualiza Firestore
+// ═════════════════════════════════════════════════════════════════════════════
+app.post('/stripe', async (req, res) => {
+  let event;
+  const sig = req.headers['stripe-signature'];
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('❌ Firma Stripe inválida:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  console.log('📩 Evento Stripe:', event.type);
+
+  try {
+    switch (event.type) {
+
+      // ─── Pago exitoso — ACTIVAR membresía ─────────────────────────────────
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const email = (session.customer_email || session.customer_details?.email || '').toLowerCase().trim();
+        const nombre = session.metadata?.nombre || session.customer_details?.name || email.split('@')[0];
+        const whatsapp = session.customer_details?.phone || '';
+        const planKey = session.metadata?.plan || 'mensual';
+        const plan = planKey === 'anual' ? 'VIP Anual' : 'VIP Mensual';
+
+        if (!email) {
+          console.warn('⚠️ Sin email en session');
+          return res.status(200).json({ received: true });
+        }
+
+        const vence = new Date();
+        plan === 'VIP Anual' ? vence.setFullYear(vence.getFullYear() + 1) : vence.setMonth(vence.getMonth() + 1);
+        const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        let uid = session.metadata?.uid || null;
+
+        if (!uid) {
+          try {
+            const user = await auth.getUserByEmail(email);
+            uid = user.uid;
+          } catch (e) {}
+        }
+
+        if (uid) {
+          await db.collection('miembros').doc(uid).set({
+            nombre, email, whatsapp, plan,
+            estado: 'activo',
+            vence: venceStr,
+            fechaRegistro: new Date().toISOString(),
+            stripeCustomerId: session.customer,
+            stripeSubscriptionId: session.subscription,
+            ultimoPago: new Date().toISOString()
+          }, { merge: true });
+
+          const monto = session.amount_total
+            ? '$' + (session.amount_total / 100).toFixed(2) + ' ' + (session.currency || 'MXN').toUpperCase()
+            : '—';
+
+          await db.collection('pagos').add({
+            nombre, email, plan, monto,
+            stripeSessionId: session.id,
+            stripeSubscriptionId: session.subscription,
+            fecha: new Date().toISOString(),
+            estado: 'confirmado'
+          });
+
+          console.log('✅ Miembro activado:', email, '→', plan);
+        } else {
+          // Usuario aún no tiene cuenta en Auth, guardar pago pendiente
+          await db.collection('pagos_pendientes').doc(email).set({
+            email, nombre, whatsapp, plan, vence: venceStr,
+            stripeSessionId: session.id,
+            stripeSubscriptionId: session.subscription,
+            stripeCustomerId: session.customer,
+            fechaPago: new Date().toISOString()
+          });
+          console.log('⏳ Pago pendiente guardado:', email);
+        }
+        break;
+      }
+
+      // ─── Suscripción actualizada (ej. renovación automática) ──────────────
+      case 'customer.subscription.updated': {
+        const sub = event.data.object;
+        const email = (sub.metadata?.email || '').toLowerCase().trim();
+
+        if (email) {
+          const m = await buscarMiembroPorEmail(email);
+          if (m && m.userExists) {
+            const nuevoEstado = sub.status === 'active' || sub.status === 'trialing' ? 'activo' : 'inactivo';
+
+            const vence = new Date(sub.current_period_end * 1000);
+            const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            await m.ref.update({
+              estado: nuevoEstado,
+              vence: venceStr,
+              stripeSubscriptionId: sub.id
+            });
+            console.log(`🔁 Suscripción actualizada: ${email} → ${nuevoEstado}`);
+          }
+        }
+        break;
+      }
+
+      // ─── Suscripción cancelada ────────────────────────────────────────────
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const email = (sub.metadata?.email || '').toLowerCase().trim();
+
+        if (email) {
+          const m = await buscarMiembroPorEmail(email);
+          if (m && m.userExists) {
+            await m.ref.update({
+              estado: 'inactivo',
+              canceladoEn: new Date().toISOString()
+            });
+            console.log('🛑 Membresía cancelada (Stripe):', email);
+          }
+        }
+        break;
+      }
+
+      default:
+        console.log('ℹ️ Evento sin handler:', event.type);
+    }
+
+    res.status(200).json({ received: true });
+
+  } catch (err) {
+    console.error('❌ Error procesando webhook:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4) CANCELACIÓN DIRECTA — llamada desde el panel VIP del portal
+// ═════════════════════════════════════════════════════════════════════════════
+app.post('/cancelar-membresia', async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email requerido' });
 
-    console.log('Cancelación directa solicitada por:', email);
+    const emailLower = email.toLowerCase().trim();
+    console.log('🛑 Cancelación solicitada por:', emailLower);
 
-    const miembro = await buscarMiembroPorEmail(email.toLowerCase().trim());
+    const miembro = await buscarMiembroPorEmail(emailLower);
+    if (!miembro) return res.status(404).json({ error: 'Miembro no encontrado' });
 
-    if (!miembro) {
-      return res.status(404).json({ error: 'Miembro no encontrado' });
+    // Cancelar suscripción en Stripe si existe
+    const doc = await miembro.ref.get();
+    const subId = doc.data()?.stripeSubscriptionId;
+    if (subId) {
+      try {
+        await stripe.subscriptions.cancel(subId);
+        console.log('✅ Stripe subscription cancelled:', subId);
+      } catch (e) {
+        console.warn('⚠️ No se pudo cancelar en Stripe (tal vez ya estaba cancelada):', e.message);
+      }
     }
 
     await miembro.ref.update({
@@ -186,117 +284,13 @@ app.post('/cancelar-membresia', async (req, res) => {
       canceladoEn: new Date().toISOString()
     });
 
-    console.log('Membresía cancelada directamente:', email);
     res.status(200).json({ success: true });
 
   } catch (err) {
-    console.error('Error en cancelación directa:', err);
+    console.error('❌ Error cancelar-membresia:', err);
     res.status(500).json({ error: err.message });
   }
-});
-
-// OPTIONS preflight para CORS
-app.options('/cancelar-membresia', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://teccapitalweb.github.io');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(200);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`AgroClub Webhook running on port ${PORT}`));
-
-// ══════════════════════════════════════════════════════════════════════════════
-// CREAR CHECKOUT — Railway usa Admin token para crear checkout con email
-// ══════════════════════════════════════════════════════════════════════════════
-app.options('/crear-checkout', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.sendStatus(200);
-});
-
-app.post('/crear-checkout', async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  try {
-    const { productId, email } = req.body;
-    if (!productId || !email) return res.status(400).json({ error: 'Faltan datos' });
-
-    const SHOP  = 'pfueck-wm.myshopify.com';
-    const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
-
-    const VARIANTS = {
-      '8462089257014': { variantId: 45322441687094, sellingPlanId: 2071691318 },
-      '8462204141622': { variantId: 45322590224438, sellingPlanId: 2071724086 }
-    };
-    const plan = VARIANTS[productId];
-    if (!plan) return res.status(400).json({ error: 'Producto no encontrado' });
-
-    const draftRes = await fetch(`https://${SHOP}/admin/api/2023-10/draft_orders.json`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': TOKEN
-      },
-      body: JSON.stringify({
-        draft_order: {
-          line_items: [{
-            variant_id: plan.variantId,
-            quantity: 1,
-            applied_selling_plan: { selling_plan_id: plan.sellingPlanId }
-          }],
-          email,
-          use_customer_default_address: false,
-          note: 'AgroClub MX',
-          redirect_url: `https://teccapitalweb.github.io/AgroClub---mx/?email=${encodeURIComponent(email)}&paid=true`
-        }
-      })
-    });
-
-    const draftData = await draftRes.json();
-    console.log('Draft order response:', JSON.stringify(draftData));
-    const invoiceUrl = draftData?.draft_order?.invoice_url;
-    if (!invoiceUrl) return res.status(500).json({ error: 'No se pudo crear checkout', detail: draftData });
-
-    res.json({ checkoutUrl: invoiceUrl });
-
-  } catch (err) {
-    console.error('Error crear-checkout:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── OAuth callback — captura code y obtiene access token ─────────────────────
-app.get('/auth/callback', async (req, res) => {
-  const { code, shop } = req.query;
-  if (!code || !shop) return res.status(400).send('Faltan parámetros');
-
-  try {
-    const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id:     'af33db76b7b0f68c1dba2d4d54e79112',
-        client_secret: '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',
-        code
-      })
-    });
-    const tokenData = await tokenRes.json();
-    const token = tokenData.access_token;
-
-    if (!token) {
-      console.error('Token error:', JSON.stringify(tokenData));
-      return res.status(500).send('No se pudo obtener el token: ' + JSON.stringify(tokenData));
-    }
-
-    console.log('ACCESS TOKEN OBTENIDO:', token);
-    res.send(`<h1>Token obtenido ✅</h1><p><strong>${token}</strong></p><p>Copia este token y agrégalo en Railway como SHOPIFY_ACCESS_TOKEN</p>`);
-
-  } catch (err) {
-    console.error('Auth error:', err);
-    res.status(500).send('Error: ' + err.message);
-  }
-});
+app.listen(PORT, () => console.log(`🚀 AgroClub Webhook (Stripe) running on port ${PORT}`));
