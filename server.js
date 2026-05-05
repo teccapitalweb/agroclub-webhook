@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 });
 
 // ─── Raw body para Stripe (DEBE ir antes de express.json) ────────────────────
-app.use('/stripe', express.raw({ type: 'application/json' }));
+app.use('/stripe-webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // ─── Helper: buscar miembro por email ────────────────────────────────────────
@@ -120,7 +120,7 @@ app.get('/verificar-session/:sessionId', async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 // 3) WEBHOOK STRIPE — recibe eventos y actualiza Firestore
 // ═════════════════════════════════════════════════════════════════════════════
-app.post('/stripe', async (req, res) => {
+app.post('/stripe-webhook', async (req, res) => {
   let event;
   const sig = req.headers['stripe-signature'];
 
