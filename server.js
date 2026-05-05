@@ -162,7 +162,21 @@ app.post('/stripe', async (req, res) => {
           try {
             const user = await auth.getUserByEmail(email);
             uid = user.uid;
-          } catch (e) {}
+            console.log(`✅ UID recuperado de Firebase Auth: ${uid}`);
+          } catch (e) {
+            console.warn(`⚠️ Usuario no existe en Firebase Auth para email: ${email}. Intentando crearlo automáticamente...`);
+            try {
+              const newUser = await auth.createUser({
+                email: email,
+                displayName: nombre || email.split('@')[0],
+                emailVerified: true
+              });
+              uid = newUser.uid;
+              console.log(`✅ Usuario creado automáticamente en Firebase Auth: ${uid}`);
+            } catch (createError) {
+              console.error(`❌ No se pudo crear usuario Auth: ${createError.message}`);
+            }
+          }
         }
 
         // ═══ FIX: Si aún no tenemos WhatsApp, buscar en usuarios_free ═══
@@ -186,19 +200,124 @@ app.post('/stripe', async (req, res) => {
           whatsapp = session.customer_details?.phone || '';
         }
 
-        if (uid) {
-          await db.collection('miembros').doc(uid).set({
-            nombre, email, whatsapp, plan,
+        const docId = uid || email;
+        if (docId) {
+          console.log(`📝 Escribiendo en miembros/${docId} (uid: ${uid ? 'sí' : 'NO - usando email'})`);
+          await db.collection('miembros').doc(docId).set({
+            nombre,
+            email,
+            whatsapp,
+            plan,
             estado: 'activo',
             vence: venceStr,
             fechaRegistro: new Date().toISOString(),
             stripeCustomerId: session.customer,
             stripeSubscriptionId: session.subscription,
-            ultimoPago: new Date().toISOString()
+            ultimoPago: new Date().toISOString(),
+            uid: uid || null,
           }, { merge: true });
 
           const monto = session.amount_total
-            ? '$' + (session.amount_total / 100).toFixed(2) + ' ' + (session.currency || 'MXN').toUpperCase()
+            ? '
+        break;
+      }
+
+      // ─── Suscripción actualizada (ej. renovación automática) ──────────────
+      case 'customer.subscription.updated': {
+        const sub = event.data.object;
+        const email = (sub.metadata?.email || '').toLowerCase().trim();
+
+        if (email) {
+          const m = await buscarMiembroPorEmail(email);
+          if (m && m.userExists) {
+            const nuevoEstado = sub.status === 'active' || sub.status === 'trialing' ? 'activo' : 'inactivo';
+
+            const vence = new Date(sub.current_period_end * 1000);
+            const venceStr = vence.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            await m.ref.update({
+              estado: nuevoEstado,
+              vence: venceStr,
+              stripeSubscriptionId: sub.id
+            });
+            console.log(`🔁 Suscripción actualizada: ${email} → ${nuevoEstado}`);
+          }
+        }
+        break;
+      }
+
+      // ─── Suscripción cancelada ────────────────────────────────────────────
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const email = (sub.metadata?.email || '').toLowerCase().trim();
+
+        if (email) {
+          const m = await buscarMiembroPorEmail(email);
+          if (m && m.userExists) {
+            await m.ref.update({
+              estado: 'inactivo',
+              canceladoEn: new Date().toISOString()
+            });
+            console.log('🛑 Membresía cancelada (Stripe):', email);
+          }
+        }
+        break;
+      }
+
+      default:
+        console.log('ℹ️ Evento sin handler:', event.type);
+    }
+
+    res.status(200).json({ received: true });
+
+  } catch (err) {
+    console.error('❌ Error procesando webhook:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4) CANCELACIÓN DIRECTA — llamada desde el panel VIP del portal
+// ═════════════════════════════════════════════════════════════════════════════
+app.post('/cancelar-membresia', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requerido' });
+
+    const emailLower = email.toLowerCase().trim();
+    console.log('🛑 Cancelación solicitada por:', emailLower);
+
+    const miembro = await buscarMiembroPorEmail(emailLower);
+    if (!miembro) return res.status(404).json({ error: 'Miembro no encontrado' });
+
+    // Cancelar suscripción en Stripe si existe
+    const doc = await miembro.ref.get();
+    const subId = doc.data()?.stripeSubscriptionId;
+    if (subId) {
+      try {
+        await stripe.subscriptions.cancel(subId);
+        console.log('✅ Stripe subscription cancelled:', subId);
+      } catch (e) {
+        console.warn('⚠️ No se pudo cancelar en Stripe (tal vez ya estaba cancelada):', e.message);
+      }
+    }
+
+    await miembro.ref.update({
+      estado: 'inactivo',
+      canceladoEn: new Date().toISOString()
+    });
+
+    res.status(200).json({ success: true });
+
+  } catch (err) {
+    console.error('❌ Error cancelar-membresia:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 AgroClub Webhook (Stripe) running on port ${PORT}`));
+ + (session.amount_total / 100).toFixed(2) + ' ' + (session.currency || 'MXN').toUpperCase()
             : '—';
 
           await db.collection('pagos').add({
@@ -209,17 +328,9 @@ app.post('/stripe', async (req, res) => {
             estado: 'confirmado'
           });
 
-          console.log('✅ Miembro activado:', email, '→', plan);
+          console.log(`✅ Miembro activado: ${email} | Plan: ${plan} | Vence: ${venceStr}`);
         } else {
-          // Usuario aún no tiene cuenta en Auth, guardar pago pendiente
-          await db.collection('pagos_pendientes').doc(email).set({
-            email, nombre, whatsapp, plan, vence: venceStr,
-            stripeSessionId: session.id,
-            stripeSubscriptionId: session.subscription,
-            stripeCustomerId: session.customer,
-            fechaPago: new Date().toISOString()
-          });
-          console.log('⏳ Pago pendiente guardado:', email);
+          console.error(`❌ CRÍTICO: Sin uid ni email para crear documento. Metadata: ${JSON.stringify(session.metadata)}`);
         }
         break;
       }
