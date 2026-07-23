@@ -20,11 +20,25 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const PRICE_MENSUAL = process.env.STRIPE_PRICE_MENSUAL || 'price_1TPb9nPBgqsOPfUYOzCZpX42';
 const PRICE_ANUAL   = process.env.STRIPE_PRICE_ANUAL   || 'price_1TPbCQPBgqsOPfUYZhUk9OGQ';
 
-// ─── CORS global ─────────────────────────────────────────────────────────────
+// ─── CORS ────────────────────────────────────────────────────────────────────
+// Solo los orígenes reales del landing y del portal. Se responde el header
+// únicamente si el Origin está en la lista; las peticiones sin Origin
+// (Stripe → /stripe-webhook, curl, health checks) pasan sin tocar: CORS es un
+// mecanismo de navegador y no debe usarse como control de acceso.
+const ORIGENES_PERMITIDOS = new Set([
+  'https://agrotecamerican.com',
+  'https://www.agrotecamerican.com',
+  'https://teccapitalweb.github.io'
+]);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, stripe-signature');
+  const origin = req.headers.origin;
+  if (origin && ORIGENES_PERMITIDOS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, stripe-signature');
+  }
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -296,18 +310,44 @@ app.post('/stripe-webhook', async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 app.post('/cancelar-membresia', async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email requerido' });
+    // ─── 1) Exigir idToken de Firebase ───────────────────────────────────────
+    // El email del body ya NO se usa para decidir a quién se cancela: un email
+    // no es un secreto y cualquiera podría mandar el de otro socio. La identidad
+    // sale exclusivamente del token firmado por Firebase.
+    const authHeader = req.headers.authorization || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!idToken) return res.status(401).json({ error: 'No autenticado' });
 
-    const emailLower = email.toLowerCase().trim();
-    console.log('🛑 Cancelación solicitada por:', emailLower);
+    let token;
+    try {
+      token = await auth.verifyIdToken(idToken, true); // true = rechazar tokens revocados
+    } catch (e) {
+      console.warn('🚫 idToken inválido en /cancelar-membresia:', e.message);
+      return res.status(401).json({ error: 'Sesión inválida o expirada' });
+    }
 
-    const miembro = await buscarMiembroPorEmail(emailLower);
+    const emailToken = (token.email || '').toLowerCase().trim();
+    if (!emailToken) return res.status(401).json({ error: 'Token sin email' });
+
+    console.log('🛑 Cancelación solicitada por:', emailToken, '(uid:', token.uid + ')');
+
+    // ─── 2) Solo se cancela la membresía del propio dueño del token ──────────
+    const miembro = await buscarMiembroPorEmail(emailToken);
     if (!miembro) return res.status(404).json({ error: 'Miembro no encontrado' });
 
-    // Cancelar suscripción en Stripe si existe
-    const doc = await miembro.ref.get();
-    const subId = doc.data()?.stripeSubscriptionId;
+    // Cinturón y tirantes: confirmar que el doc encontrado es de este usuario.
+    // buscarMiembroPorEmail resuelve por uid de Auth o por el campo email, así
+    // que se valida contra ambos antes de tocar Stripe.
+    const docPrevio = await miembro.ref.get();
+    const emailDoc = (docPrevio.data()?.email || '').toLowerCase().trim();
+    const uidDoc = docPrevio.data()?.uid || miembro.uid;
+    if (emailDoc !== emailToken && uidDoc !== token.uid) {
+      console.error('🚨 Intento de cancelar membresía ajena. token:', token.uid, 'doc:', miembro.ref.path);
+      return res.status(403).json({ error: 'No puedes cancelar esta membresía' });
+    }
+
+    // Cancelar suscripción en Stripe si existe (reusa la lectura de arriba)
+    const subId = docPrevio.data()?.stripeSubscriptionId;
     if (subId) {
       try {
         await stripe.subscriptions.cancel(subId);
