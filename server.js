@@ -1,6 +1,8 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const Stripe = require('stripe');
+const crypto = require('crypto');
+const bunnyCatalog = require('./data/agrotec-bunny-catalog.json');
 
 const app = express();
 
@@ -20,11 +22,19 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const PRICE_MENSUAL = process.env.STRIPE_PRICE_MENSUAL || 'price_1TPb9nPBgqsOPfUYOzCZpX42';
 const PRICE_ANUAL   = process.env.STRIPE_PRICE_ANUAL   || 'price_1TPbCQPBgqsOPfUYZhUk9OGQ';
 
+// Bunny Stream (la clave de API NO se usa para reproducir; solo la Token authentication key)
+const BUNNY_STREAM_LIBRARY_ID = String(process.env.BUNNY_STREAM_LIBRARY_ID || '730478').trim();
+const BUNNY_TOKEN_AUTH_KEY = String(process.env.BUNNY_TOKEN_AUTH_KEY || '').trim();
+const BUNNY_TOKEN_TTL_SECONDS = Math.min(900, Math.max(60, Number(process.env.BUNNY_TOKEN_TTL_SECONDS) || 300));
+const BUNNY_VIDEO_IDS = new Set(
+  bunnyCatalog.flatMap(curso => (curso.clases || []).map(clase => String(clase.videoId || '').trim())).filter(Boolean)
+);
+
 // ─── CORS global ─────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, stripe-signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, stripe-signature');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -52,6 +62,62 @@ async function buscarMiembroPorEmail(email) {
 
 // Health check
 app.get('/', (req, res) => res.json({ status: 'AgroClub Webhook OK 🌱', stripe: true }));
+
+function fechaVigente(valor) {
+  if (!valor) return false;
+  if (typeof valor.toDate === 'function') return valor.toDate() > new Date();
+  var directa = new Date(valor);
+  if (!Number.isNaN(directa.getTime())) return directa > new Date();
+  var meses = { enero:0, febrero:1, marzo:2, abril:3, mayo:4, junio:5, julio:6, agosto:7, septiembre:8, octubre:9, noviembre:10, diciembre:11 };
+  var texto = String(valor).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  var match = texto.match(/(\d+)\s+de\s+([a-z]+)\s+de\s+(\d{4})/);
+  if (!match || meses[match[2]] === undefined) return false;
+  return new Date(Number(match[3]), meses[match[2]], Number(match[1]), 23, 59, 59) > new Date();
+}
+
+async function obtenerMembresia(uid, email) {
+  const directa = await db.collection('miembros').doc(uid).get();
+  if (directa.exists) return directa.data();
+  if (!email) return null;
+  const snap = await db.collection('miembros').where('email', '==', email.toLowerCase().trim()).limit(1).get();
+  return snap.empty ? null : snap.docs[0].data();
+}
+
+// Devuelve una URL efímera; nunca expone la clave privada de Bunny al navegador.
+app.post('/api/bunny/embed-token', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    if (!BUNNY_STREAM_LIBRARY_ID || !BUNNY_TOKEN_AUTH_KEY) {
+      return res.status(503).json({ error: 'Bunny Stream no está configurado en Railway' });
+    }
+
+    const videoId = String(req.body?.videoId || '').trim();
+    if (!videoId || !BUNNY_VIDEO_IDS.has(videoId)) {
+      return res.status(404).json({ error: 'Video no autorizado o inexistente' });
+    }
+
+    const authorization = String(req.headers.authorization || '');
+    if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Sesión requerida' });
+    const decoded = await auth.verifyIdToken(authorization.slice(7));
+
+    const adminDoc = await db.collection('admins').doc(decoded.uid).get();
+    const membresia = adminDoc.exists ? { estado:'activo' } : await obtenerMembresia(decoded.uid, decoded.email || '');
+    const tieneAcceso = membresia && (
+      membresia.estado === 'activo' || membresia.esVIP === true || membresia.activo === true ||
+      membresia.activa === true || fechaVigente(membresia.vence)
+    );
+    if (!tieneAcceso) return res.status(403).json({ error: 'Membresía VIP requerida' });
+
+    const expires = Math.floor(Date.now() / 1000) + BUNNY_TOKEN_TTL_SECONDS;
+    const token = crypto.createHash('sha256').update(BUNNY_TOKEN_AUTH_KEY + videoId + expires).digest('hex');
+    const embedUrl = `https://iframe.mediadelivery.net/embed/${encodeURIComponent(BUNNY_STREAM_LIBRARY_ID)}/${encodeURIComponent(videoId)}?token=${token}&expires=${expires}`;
+    return res.json({ embedUrl, expires });
+  } catch (error) {
+    if (error && String(error.code || '').startsWith('auth/')) return res.status(401).json({ error: 'Sesión inválida o vencida' });
+    console.error('❌ Bunny embed-token:', error);
+    return res.status(500).json({ error: 'No se pudo preparar el reproductor' });
+  }
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 1) CREAR CHECKOUT SESSION — Stripe Embedded
@@ -331,4 +397,7 @@ app.post('/cancelar-membresia', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 AgroClub Webhook (Stripe) running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 AgroClub Webhook (Stripe) running on port ${PORT}`);
+  console.log(`🐰 Bunny Stream: ${BUNNY_VIDEO_IDS.size} videos autorizados · POST /api/bunny/embed-token`);
+});

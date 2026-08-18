@@ -1,0 +1,861 @@
+[
+  {
+    "titulo": "Agricultura Orgánica",
+    "collectionId": "9789df4d-95a3-49d3-9a16-c14550e4d89d",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "36dea22c-a481-4d2f-95c7-1e610c69ff7c",
+        "bytes": 622458984
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "81edc120-a480-481b-bcc4-5f08c938ca2b",
+        "bytes": 667849559
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "b7f211d7-2a46-4963-9204-f9c01386fb71",
+        "bytes": 669137821
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "893a3887-d006-4ab7-a7da-804a0dcb7f3a",
+        "bytes": 732146278
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "23d1b473-1210-4ebf-9709-10e120178f0a",
+        "bytes": 762907890
+      }
+    ]
+  },
+  {
+    "titulo": "Cultivo de berries",
+    "collectionId": "65f9e122-7ddf-400c-8fb6-e7ed2fe9ed86",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "20148f0e-6e29-4ef6-90e1-3ed9c0d9fe6a",
+        "bytes": 213064382
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "437bab80-7364-4f49-a30b-23b6b17e44eb",
+        "bytes": 244110655
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "b98b64a7-a3b7-4c96-b845-aade5508245f",
+        "bytes": 274581324
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "b5fe6416-ad5a-4761-b12c-c62c8c552f34",
+        "bytes": 278246941
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "8f97664a-bddc-40b6-9692-048ebcc87602",
+        "bytes": 244560556
+      }
+    ]
+  },
+  {
+    "titulo": "Cultivo de Flor de Lilis para Corte",
+    "collectionId": "d6b7ea8e-f5de-46f0-a034-92f6bcdec0a8",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "258526db-ae53-4f72-8519-87983a29f477",
+        "bytes": 770124986
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "9c8a426c-59d9-42d3-a088-218cf2405a6e",
+        "bytes": 281379940
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "dc93a425-f798-4a21-b150-aa6fd8e86206",
+        "bytes": 239224727
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "08cd1059-2ba3-4eff-b06e-57418104ade7",
+        "bytes": 74480809
+      }
+    ]
+  },
+  {
+    "titulo": "Derivados Dulces de Amaranto",
+    "collectionId": "76516341-997d-4f5a-afde-d031c5512941",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "135faca8-7544-4bb2-bc45-81c973513aa6",
+        "bytes": 350949344
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "fe98a148-dbf9-454c-b63a-df346d7f4342",
+        "bytes": 393381996
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "42c0b6a0-a7d9-4198-9e54-938d3d2605a0",
+        "bytes": 258988051
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "3c71ef99-59e1-41b3-a147-f7917eb73849",
+        "bytes": 183326215
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "9d7b5e14-d202-4cb8-be1e-3e5b3a45a6ba",
+        "bytes": 308968796
+      }
+    ]
+  },
+  {
+    "titulo": "Diseño de Programas Nutricionales en Diferentes Cultivos",
+    "collectionId": "78d8504f-c245-48ca-94e8-f82308b32118",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6bfb1d76-28db-4400-8a36-bf60fdf79540",
+        "bytes": 298989964
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "736fcf0f-db6f-4ac4-8c3f-629cc79fc36c",
+        "bytes": 209536899
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "80a91afe-67e9-48f8-b2d8-60d135d18c0b",
+        "bytes": 313262444
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "161cbb66-9cb6-4776-8b33-193b7e8227d9",
+        "bytes": 276150475
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "a2900ead-24c8-469e-9452-4ef3955bc054",
+        "bytes": 246490418
+      }
+    ]
+  },
+  {
+    "titulo": "Especializado en el Cultivo de Hierbas Aromáticas",
+    "collectionId": "56f8b7db-2970-472b-8b8b-26a765324628",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6245c0d7-7ba7-42d7-a070-03ae75750ad6",
+        "bytes": 298754679
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "4c2e7bf8-c7cd-43d5-a950-ec4b6f644f6c",
+        "bytes": 357945896
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "da300f89-02b3-41d6-bbe9-d8ee0d591b58",
+        "bytes": 248373883
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "c05fda92-5596-423e-9902-1d4a602267ac",
+        "bytes": 625916153
+      }
+    ]
+  },
+  {
+    "titulo": "FLORACIÓN Y CUAJADO EN FRUTALES TROPICALES",
+    "collectionId": "6ced5e3f-5396-4fe4-9028-aecda3ce1820",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "a023fc64-21fa-4b3f-84a5-2f033464ae8f",
+        "bytes": 254555886
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "4527d8a1-0243-44c9-ae91-5f192a8c290c",
+        "bytes": 222333610
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "6b01b175-e5c3-4bea-9ee2-c6c91eb37aea",
+        "bytes": 320669653
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "e899924f-7800-48cb-b1df-79e66e882221",
+        "bytes": 224984020
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "d1536231-917f-4cdc-a782-c8cef3c01470",
+        "bytes": 246930545
+      }
+    ]
+  },
+  {
+    "titulo": "Huertos Verticales y Semiurbanos",
+    "collectionId": "d704817e-7f45-4ae5-b0fb-87acf15445ec",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "da9ff79d-ab8a-45ae-a475-3ac5fde25ad5",
+        "bytes": 372221075
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "c03dd013-8690-4de4-810b-ad54cb2169a2",
+        "bytes": 412075921
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "097e0c5b-bcae-4cb5-9ed9-f81cdb563289",
+        "bytes": 285662940
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "2ddd2c82-f4cf-46bb-8525-5eaf56a79d6c",
+        "bytes": 241661259
+      }
+    ]
+  },
+  {
+    "titulo": "Inocuidad y Calidad en Empaque y Exportación Agrícola",
+    "collectionId": "4a32cb81-a833-4ae3-868d-d3f981a3869c",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6bd89020-44d6-4e09-b96c-c801000831db",
+        "bytes": 278338594
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "c8cf79df-4d24-4d9e-98b7-edc1d4ba11ab",
+        "bytes": 252797885
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "71956b18-9188-4e32-9393-e099358d3df3",
+        "bytes": 291123725
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "7468e92b-cb20-4ec0-82f5-437b1dbf0ab3",
+        "bytes": 240289988
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Agronómico de Hortalizas en Invernadero",
+    "collectionId": "2f31bd7b-6bd2-4a2d-82d2-b90eed7a65a9",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "bf1d8f9a-1f5f-4a03-9588-273049e37d0b",
+        "bytes": 514092640
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "fbb6e1f8-ebaa-465c-a4cc-220f5dd15135",
+        "bytes": 273305475
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "f602479e-4160-4f1d-b16f-f0197a39645d",
+        "bytes": 425995482
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "1507da13-23b9-40c1-9a99-fd94b9d21f92",
+        "bytes": 254404751
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Agronómico de la Cebolla",
+    "collectionId": "ea2564bd-faac-40ba-a50a-6d94e44fa8f8",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6370c153-c12a-4c70-9441-991ed95ec9d0",
+        "bytes": 261062252
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "4b06e1c7-b370-4576-b4d6-9576161aff08",
+        "bytes": 317978392
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "f081c172-52bb-4def-a316-af20963b47bd",
+        "bytes": 243787161
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "4e66488e-b026-4f99-af5b-dcd672771fef",
+        "bytes": 352106454
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Agronómico del Cultivo de Piña",
+    "collectionId": "c68ae080-22c9-4cb5-bcda-2ea4abf68b53",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "e2a7a01b-2cf3-450a-9deb-958868f8afeb",
+        "bytes": 526498540
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "52e51158-b12c-4fa0-a871-385984dca1e9",
+        "bytes": 521800201
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "4c504f31-21b1-4ef5-b797-e7ff93a19909",
+        "bytes": 342154385
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "d5adcc20-23e5-4045-94f4-5a6d5f795e64",
+        "bytes": 531138631
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "fcece7cd-c6bb-41f8-b033-0808abe38909",
+        "bytes": 350416372
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo de Cultivo de Jitomate en Invernadero",
+    "collectionId": "858ab5f6-75f5-4917-84a9-a647e5e0c06a",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6a89d87b-9189-4932-a9b8-b11c61b9e66f",
+        "bytes": 379558130
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "ef52566c-2317-48b3-818f-8449c40b93cd",
+        "bytes": 288561233
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "31b0fd83-dfd3-40dc-aa46-30df1f527767",
+        "bytes": 309772761
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "9997a834-d492-40b3-87de-9fdf83f3c654",
+        "bytes": 397124193
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "2176be31-91a6-4706-966d-1377f1286aa3",
+        "bytes": 191641841
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo de Suelos Sódicos Salinos",
+    "collectionId": "acd33dfd-294f-488d-b35b-1d3f25908f2f",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "12eff161-f1b9-4530-98bd-4ee9ffecc92a",
+        "bytes": 207831776
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "bb19b623-30c5-4249-8b52-5f35ee328600",
+        "bytes": 267143964
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "f969c358-8cc5-4734-a7a2-30476cda0442",
+        "bytes": 275047176
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "717ca9aa-aafb-4894-a253-2dca096a07fa",
+        "bytes": 262624883
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "4db5b6ae-4e59-4fb1-8db5-771c6f07ff43",
+        "bytes": 220927357
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Integral de Frambuesa",
+    "collectionId": "9f3ded64-9415-4356-a3c7-318ccd838828",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "4a30cb85-f10e-49b4-a186-23d805324fe9",
+        "bytes": 209954161
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "f2db37bf-60f2-4bdd-9e6a-3855b91a180a",
+        "bytes": 262574619
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "9d1e1652-e1c5-4018-87c4-c7a3a6d35ccf",
+        "bytes": 278046814
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "a2123663-91c5-480c-ab03-34bd8e0e543b",
+        "bytes": 176956497
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Integral de Granos Básicos",
+    "collectionId": "b14b6a1f-140c-4f0e-837f-a82b03c3d25b",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "4ab1b1dc-c1e2-42d6-8176-b221c300d882",
+        "bytes": 430205815
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "afb15f34-fe51-42a4-94a3-f32c53489460",
+        "bytes": 357348359
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "de937f91-60c2-4538-a8c6-48d0ae7fad81",
+        "bytes": 360291190
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "a5485da9-af3f-44e8-889e-0240cdba9065",
+        "bytes": 396709764
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "c685cc06-c02e-45e0-a96a-9c66e5249a7f",
+        "bytes": 331558487
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo Integral del Cultivo de Cacao",
+    "collectionId": "f7116177-d946-4264-8254-8b753286422a",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "6460e223-f9df-4a9c-aac4-d8cbb2610cf9",
+        "bytes": 447671733
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "0d0a085c-fbc5-48c7-8981-21e565c219d8",
+        "bytes": 419247055
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "c03daeeb-5ca1-43ec-a8b9-edde420f3baa",
+        "bytes": 467175614
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "5d4dc0ea-7f0f-45df-911d-79f1aae6f85b",
+        "bytes": 242846402
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "596d9e9a-a699-40cb-8164-9317723896b8",
+        "bytes": 493515366
+      },
+      {
+        "num": 6,
+        "titulo": "Clase 6",
+        "provider": "bunny",
+        "videoId": "df212992-5984-49d6-9970-bd7fbf4a761b",
+        "bytes": 533016958
+      }
+    ]
+  },
+  {
+    "titulo": "Manejo y Nutrición de Suculentas",
+    "collectionId": "5abcfe8a-cb5f-4b5f-987e-0879c277b4f8",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "9d86c55d-e0e7-4860-bf6f-ad2956c2c3c6",
+        "bytes": 710917419
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "734d0516-f675-467b-b005-30647d818d22",
+        "bytes": 839272039
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "d1843ef9-edbf-49be-9100-369a32d5efc1",
+        "bytes": 728949532
+      }
+    ]
+  },
+  {
+    "titulo": "Producción Rentable de Girasoles para Corte y Ornato",
+    "collectionId": "c3d49f90-8015-44d9-ab44-549cb104959b",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "de31e026-c3d7-4872-b505-320c8057dbdc",
+        "bytes": 424663218
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "6ac731a5-03bc-4350-85c8-a1bd9731d047",
+        "bytes": 362219594
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "ae65c561-e829-4a3f-835d-d469b9cb6a1e",
+        "bytes": 209541299
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "2757df37-bade-4170-90f9-9641d31f8351",
+        "bytes": 549721614
+      }
+    ]
+  },
+  {
+    "titulo": "Producción y Manejo Comercial de Gladiolas",
+    "collectionId": "d5a9e946-5f3f-4019-9726-baa6846c0cc6",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "5c8acb56-0381-4693-a146-0b9a3f8dcb03",
+        "bytes": 208702991
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "210e3429-f008-43db-b572-f8f016151309",
+        "bytes": 318117652
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "7be3d5f6-8b7f-4d45-be3c-3d09f84015cf",
+        "bytes": 247615539
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "1c4f736b-12c3-4045-88cd-f13edda7b1e3",
+        "bytes": 273048161
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "7c88bcc5-196e-417d-bf32-249d1a2f4523",
+        "bytes": 515671637
+      }
+    ]
+  },
+  {
+    "titulo": "Productos a Base de Maíces de Colores",
+    "collectionId": "6e6b20cd-8c9c-40bb-bc94-764bca23d28f",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "7e72bb94-0891-4b83-a8e4-0a36384f26be",
+        "bytes": 598377732
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "02457dee-f6d2-429b-939a-3acccd5dbdc1",
+        "bytes": 651988415
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "9bb8112c-ba53-4cf8-bc63-0e33ed35715d",
+        "bytes": 593540840
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "7b0a6d99-a277-4b1a-ac11-c08257cb7f32",
+        "bytes": 739865500
+      }
+    ]
+  },
+  {
+    "titulo": "Técnicas de Reproducción y Mejora Genética en Suculentas",
+    "collectionId": "12ce77b1-b03e-4bcc-9bf2-7a6c865fd45c",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "91d0a37d-d3fa-4ded-8f5b-c693eb666ef7",
+        "bytes": 634430464
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "e478c2ab-99d6-4e75-80e2-6fbeca783c1a",
+        "bytes": 648167372
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "47e02b83-a0d2-4c70-af10-a29bd1ca9539",
+        "bytes": 294523858
+      }
+    ]
+  },
+  {
+    "titulo": "Uso Responsable de Agroquímicos",
+    "collectionId": "ec3b1205-2273-4c6c-8eae-63b1e44fb16f",
+    "clases": [
+      {
+        "num": 1,
+        "titulo": "Clase 1",
+        "provider": "bunny",
+        "videoId": "94fb4193-58e1-426d-baef-4e80121bb743",
+        "bytes": 368305631
+      },
+      {
+        "num": 2,
+        "titulo": "Clase 2",
+        "provider": "bunny",
+        "videoId": "300566c7-2a0a-467d-9fe6-b77d4495ac63",
+        "bytes": 175600508
+      },
+      {
+        "num": 3,
+        "titulo": "Clase 3",
+        "provider": "bunny",
+        "videoId": "e4473101-8321-4be0-8cfb-f79769bf3252",
+        "bytes": 441963507
+      },
+      {
+        "num": 4,
+        "titulo": "Clase 4",
+        "provider": "bunny",
+        "videoId": "3257baf6-7bfc-493b-9161-433385b86b0d",
+        "bytes": 211719803
+      },
+      {
+        "num": 5,
+        "titulo": "Clase 5",
+        "provider": "bunny",
+        "videoId": "daaf641b-1e46-49eb-b41d-7d750b79c388",
+        "bytes": 409935900
+      }
+    ]
+  }
+]
