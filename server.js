@@ -83,6 +83,30 @@ async function obtenerMembresia(uid, email) {
   return snap.empty ? null : snap.docs[0].data();
 }
 
+// ── Clase muestra gratis (lógica ICADEM): la primera clase del primer curso
+//    se puede reproducir sin membresía. Mismo criterio que el frontend:
+//    curso con menor `orden` (sin orden = al final) y su clase con menor `num`.
+let _muestraCache = { videoId: null, ts: 0 };
+async function obtenerVideoMuestraGratis() {
+  if (_muestraCache.ts && (Date.now() - _muestraCache.ts) < 5 * 60 * 1000) return _muestraCache.videoId;
+  try {
+    const snap = await db.collection('cursos').get();
+    const cursos = snap.docs.map(d => d.data())
+      .filter(c => Array.isArray(c.clases) && c.clases.length && c.activo !== false)
+      .sort((a, b) => (Number(a.orden) || 9999) - (Number(b.orden) || 9999));
+    let videoId = null;
+    if (cursos.length) {
+      const clases = cursos[0].clases.slice().sort((a, b) => (Number(a.num) || 9999) - (Number(b.num) || 9999));
+      videoId = clases[0] && clases[0].videoId ? String(clases[0].videoId) : null;
+    }
+    _muestraCache = { videoId, ts: Date.now() };
+    return videoId;
+  } catch (e) {
+    console.error('❌ obtenerVideoMuestraGratis:', e.message);
+    return null;
+  }
+}
+
 // Devuelve una URL efímera; nunca expone la clave privada de Bunny al navegador.
 app.post('/api/bunny/embed-token', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -106,7 +130,13 @@ app.post('/api/bunny/embed-token', async (req, res) => {
       membresia.estado === 'activo' || membresia.esVIP === true || membresia.activo === true ||
       membresia.activa === true || fechaVigente(membresia.vence)
     );
-    if (!tieneAcceso) return res.status(403).json({ error: 'Membresía VIP requerida' });
+    if (!tieneAcceso) {
+      const videoGratis = await obtenerVideoMuestraGratis();
+      if (!videoGratis || videoGratis !== videoId) {
+        return res.status(403).json({ error: 'Membresía VIP requerida' });
+      }
+      // Clase muestra gratis: se permite reproducir sin membresía (lógica ICADEM)
+    }
 
     const expires = Math.floor(Date.now() / 1000) + BUNNY_TOKEN_TTL_SECONDS;
     const token = crypto.createHash('sha256').update(BUNNY_TOKEN_AUTH_KEY + videoId + expires).digest('hex');
