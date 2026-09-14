@@ -2,6 +2,7 @@ const express = require('express');
 const admin = require('firebase-admin');
 const Stripe = require('stripe');
 const crypto = require('crypto');
+const lessonAccess = require('./lesson-access');
 const bunnyCatalog = require('./data/agrotec-bunny-catalog.json');
 
 const app = express();
@@ -83,28 +84,42 @@ async function obtenerMembresia(uid, email) {
   return snap.empty ? null : snap.docs[0].data();
 }
 
-// ── Clase muestra gratis (lógica ICADEM): la primera clase del primer curso
-//    se puede reproducir sin membresía. Mismo criterio que el frontend:
-//    curso con menor `orden` (sin orden = al final) y su clase con menor `num`.
-let _muestraCache = { videoId: null, ts: 0 };
-async function obtenerVideoMuestraGratis() {
-  if (_muestraCache.ts && (Date.now() - _muestraCache.ts) < 5 * 60 * 1000) return _muestraCache.videoId;
-  try {
-    const snap = await db.collection('cursos').get();
-    const cursos = snap.docs.map(d => d.data())
-      .filter(c => Array.isArray(c.clases) && c.clases.length && c.activo !== false)
-      .sort((a, b) => (Number(a.orden) || 9999) - (Number(b.orden) || 9999));
-    let videoId = null;
-    if (cursos.length) {
-      const clases = cursos[0].clases.slice().sort((a, b) => (Number(a.num) || 9999) - (Number(b.num) || 9999));
-      videoId = clases[0] && clases[0].videoId ? String(clases[0].videoId) : null;
-    }
-    _muestraCache = { videoId, ts: Date.now() };
-    return videoId;
-  } catch (e) {
-    console.error('❌ obtenerVideoMuestraGratis:', e.message);
-    return null;
+// Shared playback identity: the server verifies both the session and membership/admin status.
+async function accesoParaReproduccion(req) {
+  const authorization = String(req.headers.authorization || '');
+  if (!authorization.startsWith('Bearer ')) {
+    const error = new Error('Sesión requerida'); error.code = 'auth/missing-token'; throw error;
   }
+  const decoded = await auth.verifyIdToken(authorization.slice(7));
+  const adminDoc = await db.collection('admins').doc(decoded.uid).get();
+  const member = adminDoc.exists ? {} : await obtenerMembresia(decoded.uid, decoded.email || '');
+  return {
+    isAdmin: adminDoc.exists,
+    hasMembership: Boolean(member && (member.estado === 'activo' || member.esVIP === true || member.activo === true
+      || member.activa === true || fechaVigente(member.vence)))
+  };
+}
+
+// The first active course is the welcome course; only its final lesson is paid.
+// Resolve the current catalogue on each free playback request so edits revoke access immediately.
+async function autorizarClaseGratuita(courseId, lessonNumber, videoId) {
+  const legacyRequest = courseId == null && lessonNumber == null;
+  if (!legacyRequest && (!courseId || lessonNumber == null || !Number.isFinite(Number(lessonNumber)))) return false;
+  const snap = await db.collection('cursos').get();
+  const courses = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+  const course = lessonAccess.firstCourse(courses);
+  // Keep already-open clients working: infer a missing pair only from a matching free video.
+  if (legacyRequest) {
+    const match = (course?.clases || []).find(l => String(l.videoId || '') === videoId && lessonAccess.isFreeLesson(courses, course.id, l.num));
+    if (!match) return false;
+    courseId = course.id; lessonNumber = match.num;
+  }
+  if (!lessonAccess.isFreeLesson(courses, courseId, lessonNumber)) return false;
+  const lesson = course.clases.find(item => Number(item.num) === Number(lessonNumber));
+  if (!lesson || String(lesson.videoId || '') !== videoId) return false;
+  // A duplicated video assigned to paid content must not become a free back door.
+  return courses.every(c => (c.clases || []).every(l => String(l.videoId || '') !== videoId
+    || lessonAccess.isFreeLesson(courses, c.id, l.num)));
 }
 
 // Devuelve una URL efímera; nunca expone la clave privada de Bunny al navegador.
@@ -120,22 +135,13 @@ app.post('/api/bunny/embed-token', async (req, res) => {
       return res.status(404).json({ error: 'Video no autorizado o inexistente' });
     }
 
-    const authorization = String(req.headers.authorization || '');
-    if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Sesión requerida' });
-    const decoded = await auth.verifyIdToken(authorization.slice(7));
-
-    const adminDoc = await db.collection('admins').doc(decoded.uid).get();
-    const membresia = adminDoc.exists ? { estado:'activo' } : await obtenerMembresia(decoded.uid, decoded.email || '');
-    const tieneAcceso = membresia && (
-      membresia.estado === 'activo' || membresia.esVIP === true || membresia.activo === true ||
-      membresia.activa === true || fechaVigente(membresia.vence)
-    );
-    if (!tieneAcceso) {
-      const videoGratis = await obtenerVideoMuestraGratis();
-      if (!videoGratis || videoGratis !== videoId) {
+    const access = await accesoParaReproduccion(req);
+    if (!access.hasMembership && !access.isAdmin) {
+      const autorizado = await autorizarClaseGratuita(req.body?.courseId, req.body?.lessonNumber, videoId);
+      if (!autorizado) {
         return res.status(403).json({ error: 'Membresía VIP requerida' });
       }
-      // Clase muestra gratis: se permite reproducir sin membresía (lógica ICADEM)
+      // Free welcome lesson: the final lesson and every other course remain paid.
     }
 
     const expires = Math.floor(Date.now() / 1000) + BUNNY_TOKEN_TTL_SECONDS;
@@ -145,6 +151,38 @@ app.post('/api/bunny/embed-token', async (req, res) => {
   } catch (error) {
     if (error && String(error.code || '').startsWith('auth/')) return res.status(401).json({ error: 'Sesión inválida o vencida' });
     console.error('❌ Bunny embed-token:', error);
+    return res.status(500).json({ error: 'No se pudo preparar el reproductor' });
+  }
+});
+
+// Existing Drive lessons use the same server policy as Bunny; the client cannot choose a URL.
+// Drive URLs are not signed/expiring. Existing sharing settings still govern known direct links.
+app.post('/api/lesson-playback', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const access = await accesoParaReproduccion(req);
+    const { courseId, lessonNumber } = req.body || {};
+    const validNumber = typeof lessonNumber === 'number' || (typeof lessonNumber === 'string' && /^\d+$/.test(lessonNumber));
+    if (typeof courseId !== 'string' || !courseId.trim() || !validNumber
+      || !Number.isInteger(Number(lessonNumber)) || Number(lessonNumber) < 0) {
+      return res.status(400).json({ error: 'Indica un curso y una clase válidos' });
+    }
+    const snap = await db.collection('cursos').get();
+    const courses = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    const course = lessonAccess.orderedCourses(courses).find(c => String(c.id) === courseId);
+    const matches = (course?.clases || []).filter(l => Number(l.num) === Number(lessonNumber));
+    if (matches.length !== 1) return res.status(404).json({ error: 'Clase no encontrada' });
+    if (!lessonAccess.canPlay({ courses, courseId, lessonNumber, ...access })) {
+      return res.status(403).json({ error: 'La última clase y los demás cursos requieren membresía', code: 'membership_required' });
+    }
+    const driveId = String(matches[0].driveId || '').trim();
+    if (!/^[A-Za-z0-9_-]+$/.test(driveId)) {
+      return res.status(409).json({ error: 'Esta clase todavía no tiene video disponible', code: 'video_unavailable' });
+    }
+    return res.json({ provider: 'drive', embedUrl: `https://drive.google.com/file/d/${encodeURIComponent(driveId)}/preview` });
+  } catch (error) {
+    if (error && String(error.code || '').startsWith('auth/')) return res.status(401).json({ error: 'Sesión inválida o vencida' });
+    console.error('Drive lesson-playback:', error.message);
     return res.status(500).json({ error: 'No se pudo preparar el reproductor' });
   }
 });
