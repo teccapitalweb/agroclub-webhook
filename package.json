@@ -4,7 +4,9 @@
   "description": "Webhook de Stripe + Firebase para AgroClub MX",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check lesson-access.js",
+    "test": "node --test lesson-access.test.js playback.test.js"
   },
   "dependencies": {
     "express": "^4.18.2",
