@@ -3,6 +3,7 @@ const admin = require('firebase-admin');
 const Stripe = require('stripe');
 const crypto = require('crypto');
 const bunnyCatalog = require('./data/agrotec-bunny-catalog.json');
+const { esEventoV2, reenviarEventoV2 } = require('./webhook-relay');
 
 const app = express();
 
@@ -231,6 +232,10 @@ app.post('/stripe-webhook', async (req, res) => {
   console.log('📩 Evento Stripe:', event.type);
 
   try {
+    if (await esEventoV2(event, stripe)) {
+      await reenviarEventoV2(req.body, sig, process.env.AGROCLUB_V2_WEBHOOK_URL);
+      return res.status(200).json({ received: true, relayed: true });
+    }
     switch (event.type) {
 
       // ─── Pago exitoso — ACTIVAR membresía ─────────────────────────────────
