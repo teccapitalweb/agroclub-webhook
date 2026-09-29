@@ -4,6 +4,7 @@ const Stripe = require('stripe');
 const crypto = require('crypto');
 const bunnyCatalog = require('./data/agrotec-bunny-catalog.json');
 const { esEventoV2, reenviarEventoV2 } = require('./webhook-relay');
+const { puedeCancelar } = require('./cancel-auth');
 
 const app = express();
 
@@ -50,7 +51,6 @@ async function buscarMiembroPorEmail(email) {
     const user = await auth.getUserByEmail(email);
     const doc  = await db.collection('miembros').doc(user.uid).get();
     if (doc.exists) return { uid: user.uid, ref: doc.ref, userExists: true };
-    return { uid: user.uid, ref: db.collection('miembros').doc(user.uid), userExists: true };
   } catch (e) {}
 
   const snap = await db.collection('miembros').where('email', '==', email).limit(1).get();
@@ -397,37 +397,30 @@ app.post('/stripe-webhook', async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 app.post('/cancelar-membresia', async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email requerido' });
-
-    const emailLower = email.toLowerCase().trim();
-    console.log('🛑 Cancelación solicitada por:', emailLower);
+    const match = /^Bearer\s+(\S+)\s*$/i.exec(String(req.headers.authorization || ''));
+    if (!match) return res.status(401).json({ error: 'Inicia sesión para administrar tu suscripción' });
+    let decoded;
+    try { decoded = await auth.verifyIdToken(match[1], true); }
+    catch { return res.status(401).json({ error: 'Sesión inválida o vencida' }); }
+    const emailLower = String(req.body?.email || decoded.email || '').trim().toLowerCase();
+    if (!emailLower) return res.status(400).json({ error: 'Email requerido' });
 
     const miembro = await buscarMiembroPorEmail(emailLower);
     if (!miembro) return res.status(404).json({ error: 'Miembro no encontrado' });
-
-    // Cancelar suscripción en Stripe si existe
     const doc = await miembro.ref.get();
-    const subId = doc.data()?.stripeSubscriptionId;
-    if (subId) {
-      try {
-        await stripe.subscriptions.cancel(subId);
-        console.log('✅ Stripe subscription cancelled:', subId);
-      } catch (e) {
-        console.warn('⚠️ No se pudo cancelar en Stripe (tal vez ya estaba cancelada):', e.message);
-      }
+    if (!doc.exists || !puedeCancelar(decoded, emailLower, doc.id, doc.data())) {
+      return res.status(403).json({ error: 'Verifica tu correo para administrar esta membresía' });
     }
-
-    await miembro.ref.update({
-      estado: 'inactivo',
-      canceladoEn: new Date().toISOString()
-    });
-
-    res.status(200).json({ success: true });
+    const subId = doc.data()?.stripeSubscriptionId;
+    if (!subId) return res.status(404).json({ error: 'No hay una suscripción de Stripe vinculada' });
+    // Cancelar al final del periodo pagado; una falla de Stripe nunca revoca acceso.
+    const sub = await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
+    await miembro.ref.update({ cancelaAlFinal: true, canceladoEn: new Date().toISOString() });
+    res.status(200).json({ success: true, accesoHasta: sub.current_period_end || null });
 
   } catch (err) {
     console.error('❌ Error cancelar-membresia:', err);
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: 'No se pudo confirmar el cambio en Stripe. Tu acceso se conserva.' });
   }
 });
 
